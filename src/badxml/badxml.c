@@ -58,6 +58,7 @@ freeAttributeListStep(XmlAttribute *first, XmlAttribute *attribute)
     if (attribute->next != first) freeAttributeListStep(first, attribute->next);
     free(attribute->value);
     free(attribute->name);
+    free(attribute);
 }
 
 static void

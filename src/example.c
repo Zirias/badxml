@@ -23,7 +23,7 @@ char *readFile(const char *filename)
     {
         readtotal += readsize;
         bufsize *= 2;
-        if (!realloc(buffer, bufsize)) exit(1);
+        if (!(buffer = realloc(buffer, bufsize))) exit(1);
     }
 
     if (file != stdin) fclose(file);
