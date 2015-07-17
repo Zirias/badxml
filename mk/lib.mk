@@ -1,6 +1,6 @@
 include mk$(PSEP)platform$(PSEP)$(PLATFORM)$(PSEP)lib.mk
 
-define LIBRULES +=
+define LIBCOMMON
 
 
 SOURCES += $$($(T)_SOURCES)
@@ -26,4 +26,4 @@ $(P)%_s.o: $(P)%.c Makefile conf.mk $(P)$(T).mk
 	$$(VR)$$(CC) -o$$@ -c $$(lib_CFLAGS) $$($(T)_DEFINES) $$(CFLAGS) \
 		$$(INCLUDES) $$<
 endef
-
+LIBRULES += $(LIBCOMMON)
