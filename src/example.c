@@ -75,7 +75,7 @@ int main(int argc, char **argv)
 
     if (!doc)
     {
-        puts("Parse error.");
+        fputs("Parse error.\n", stderr);
         return 1;
     }
 
