@@ -11,18 +11,19 @@ recognizing the most basic XML syntax. The only things recognized are:
 It might be useful in cases where you don't need a real XML parser and pulling
 in a big library seems not feasible.
 
+### What badxml supports
+
+  - parsing text to an object model, containing the above mentioned
+  - providing basic error messages with line and column number
+
 ### Things NOT supported
-(This list is incomplete)
+(This list is probably incomplete)
 
   - Character encodings
   - Doctypes, XSD and the like
   - XML entities
   - CDATA sections
   - namespaces
-
-### Things maybe added later
-
-  - A line counter so the line where a parsing error occured can be retreived
 
 ### Note on building / using
 
@@ -34,4 +35,9 @@ separate project later.
 Typical usage would probably be to just include the files `badxml.c` and
 `badxml.h` in your own source tree and maybe adapt the `#include` in
 `badxml.c` to your source tree layout.
+
+### Features maybe added later
+
+Waiting for suggestions ... anything that won't bloat it might be added if it
+seems useful.
 
