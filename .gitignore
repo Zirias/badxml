@@ -1,0 +1,9 @@
+*.o
+*.d
+*.swp
+*.xml
+conf.mk
+defaults.mk
+lib/*
+bin/*
+
