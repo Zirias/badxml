@@ -41,12 +41,12 @@ readBareWord(const char **pos, char endmark)
 {
     const char *start;
     char *word;
-    
+
     start = *pos;
-    
+
     if (!*start) return 0;
     while (!isspace(**pos) && **pos && **pos != endmark) ++(*pos);
-    
+
     word = calloc(1, (size_t)(*pos - start) + 1);
     memcpy(word, start, (size_t)(*pos - start));
     return word;
@@ -102,7 +102,7 @@ parseAttribute(const char **xmlText, XmlElement *element)
     XmlAttribute *attribute = calloc(1, sizeof(XmlAttribute));
     attribute->next = attribute->prev = attribute;
     attribute->parent = element;
-    
+
     attribute->name = readBareWord(xmlText, '=');
     if (!attribute->name || !**xmlText) goto parseAttribute_fail;
     skipWs(xmlText);
@@ -111,7 +111,7 @@ parseAttribute(const char **xmlText, XmlElement *element)
     skipWs(xmlText);
     if (**xmlText != '"') goto parseAttribute_fail;
     ++(*xmlText);
-    
+
     startval = *xmlText;
     while (**xmlText && **xmlText != '"') ++(*xmlText);
     if (!**xmlText) goto parseAttribute_fail;
@@ -119,7 +119,7 @@ parseAttribute(const char **xmlText, XmlElement *element)
     memcpy(attribute->value, startval, (size_t)(*xmlText - startval));
     ++(*xmlText);
     return attribute;
-    
+
 parseAttribute_fail:
     freeAttributeList(attribute);
     return 0;
@@ -132,23 +132,23 @@ parseElement(const char **xmlText, XmlElement *parent)
     XmlElement *childnode;
     XmlAttribute *attribute;
     const char *startval;
-    
+
     ++(*xmlText);
     if (!**xmlText || **xmlText == '/') return 0;
-    
+
     element = calloc(1, sizeof(XmlElement));
     element->prev = element->next = element;
     element->parent = parent;
     element->name = readBareWord(xmlText, '>');
     if (!element->name || !**xmlText) goto parseElement_fail;
-    
+
     childnode = 0;
     attribute = 0;
     while (1)
     {
         skipWs(xmlText);
         if (!**xmlText) goto parseElement_fail;
-    
+
         if (**xmlText == '>')
         {
             ++(*xmlText);
@@ -179,7 +179,7 @@ parseElement(const char **xmlText, XmlElement *parent)
         attribute = 0;
         if (!**xmlText) goto parseElement_fail;
     }
-    
+
     startval = *xmlText;
     while (**xmlText)
     {
@@ -227,7 +227,7 @@ parseElement(const char **xmlText, XmlElement *parent)
         }
         else ++(*xmlText);
     }
-    
+
 parseElement_fail:
     freeElementList(element);
     return 0;
@@ -238,7 +238,7 @@ parseDoc(const char *xmlText)
 {
     XmlDoc* doc = malloc(sizeof(XmlDoc));
     const char *p = xmlText;
-    
+
     doc->root = 0;
     while(*p)
     {
@@ -285,7 +285,7 @@ parseDoc(const char *xmlText)
             return 0;
         }
     }
-    
+
     return doc;
 }
 
@@ -341,14 +341,14 @@ findMatching(const XmlElement *element,
         } while (att != element->attributes);
         else return element;
     }
-    
+
     if (elem) do
     {
         found = findMatching(elem, tagname, attname, attval);
         if (found) return found;
         elem = elem->next;
     } while (elem != element->children);
-    
+
     return 0;
 }
 
@@ -412,7 +412,7 @@ static void
 dumpXmlElement(const XmlElement *e, FILE *file, int shift)
 {
     int i;
-    
+
     if (!e) return;
 
     for (i=0; i<shift; ++i) fputs(" ", file);

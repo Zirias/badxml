@@ -16,7 +16,7 @@ char *readFile(const char *filename)
 
     buffer = malloc(bufsize);
     if (!buffer) exit(1);
-    
+
     readtotal = 0;
     while ((readsize = fread(buffer + readtotal, 1,
 		    bufsize - readtotal, file)) == bufsize - readtotal)
@@ -53,7 +53,7 @@ int main(int argc, char **argv)
     doc = parseDoc(xmlText);
 
     free(xmlText);
-    
+
     if (!doc)
     {
         puts("Parse error.");
@@ -67,12 +67,12 @@ int main(int argc, char **argv)
     element = findMatching(rootElement(doc), argv[1], argv[2], argv[3]);
     if (element) val = elementContent(element);
     else val = "<not found>";
-    
+
     printf("%s[%s='%s']: %s\n", argv[1], argv[2], argv[3], val);
 
     /* release all resources allocated for the document */
     freeDoc(doc);
-    
+
     return 0;
 }
 

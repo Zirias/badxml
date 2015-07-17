@@ -37,7 +37,7 @@ XIF := if [ -x
 XTHEN := ]; then
 XFI := ; fi
 CATIN := cat
-CATADD := 
+CATADD :=
 CATOUT := >
 EQT := "
 #" make vim syntax highlight happy
