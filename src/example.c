@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 
 #include <badxml/badxml.h>
 
@@ -11,11 +13,24 @@ char *readFile(const char *filename)
     size_t readsize;
     size_t readtotal;
 
-    if (filename) file = fopen(filename, "r");
-    if (!file) file = stdin;
+    if (filename)
+    {
+	file = fopen(filename, "r");
+	if (!file)
+	{
+	    fprintf(stderr, "Cannot open `%s': %s\n",
+		    filename, strerror(errno));
+	    exit(1);
+	}
+    }
+    else file = stdin;
 
     buffer = malloc(bufsize);
-    if (!buffer) exit(1);
+    if (!buffer)
+    {
+	perror("malloc");
+	exit(1);
+    }
 
     readtotal = 0;
     while ((readsize = fread(buffer + readtotal, 1,
@@ -23,7 +38,11 @@ char *readFile(const char *filename)
     {
         readtotal += readsize;
         bufsize *= 2;
-        if (!(buffer = realloc(buffer, bufsize))) exit(1);
+        if (!(buffer = realloc(buffer, bufsize)))
+	{
+	    perror("realloc");
+	    exit(1);
+	}
     }
 
     if (file != stdin) fclose(file);
