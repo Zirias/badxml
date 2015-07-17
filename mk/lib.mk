@@ -1,29 +1,35 @@
+define LIBRULES
+$(T)_SOURCES_FULL := $(addprefix $(P)$$(PSEP),$$($(T)_SOURCES))
+SOURCES += $$($(T)_SOURCES_FULL)
+CLEAN += $$($(T)_SOURCES_FULL:.c=_s.o)
+
+
+endef
+
 include mk$(PSEP)platform$(PSEP)$(PLATFORM)$(PSEP)lib.mk
 
-define LIBCOMMON
+define LIBCOMMONRULES
 
 
-SOURCES += $$($(T)_SOURCES)
-CLEAN += $$($(T)_SOURCES:.c=_s.o)
 
-$(P)%.d: $(P)%.c Makefile conf.mk
+$(P)$$(PSEP)%.d: $(P)$$(PSEP)%.c Makefile conf.mk
 	$$(VDEP)
 	$$(VR)$$(CCDEP) -MT"$@ $(@:.d=.o) $(@:.d=_s.o)" -MF$$@ \
 	    $$(CFLAGS) $$(INCLUDES) $$<
 
 ifneq ($$(MAKECMDGOALS),clean)
 ifneq ($$(MAKECMDGOALS),distclean)
--include $$($(T)_SOURCES:.c=.d)
+-include $$($(T)_SOURCES_FULL:.c=.d)
 endif
 endif
 
-$(P)%.o: $(P)%.c Makefile conf.mk $(P)$(T).mk
+$(P)$$(PSEP)%.o: $(P)$$(PSEP)%.c Makefile conf.mk $(P)$$(PSEP)$(T).mk
 	$$(VCC)
 	$$(VR)$$(CC) -o$$@ -c $$(CFLAGS) $$($(T)_DEFINES) $$(INCLUDES) $$<
 
-$(P)%_s.o: $(P)%.c Makefile conf.mk $(P)$(T).mk
+$(P)$$(PSEP)%_s.o: $(P)$$(PSEP)%.c Makefile conf.mk $(P)$$(PSEP)$(T).mk
 	$$(VCC)
 	$$(VR)$$(CC) -o$$@ -c $$(lib_CFLAGS) $$($(T)_DEFINES) $$(CFLAGS) \
 		$$(INCLUDES) $$<
 endef
-LIBRULES += $(LIBCOMMON)
+LIBRULES += $(LIBPLATFORMRULES)$(LIBCOMMONRULES)
