@@ -7,7 +7,7 @@ char *readFile(const char *filename)
 {
     char *buffer;
     FILE *file = 0;
-    size_t bufsize = 16;
+    size_t bufsize = 1024;
     size_t readsize;
     size_t readtotal;
 
