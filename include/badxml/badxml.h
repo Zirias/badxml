@@ -31,6 +31,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdio.h>
 
+typedef enum xmlError
+{
+    XML_SUCCESS,
+    XML_EOF,
+    XML_SECONDROOT,
+    XML_UNNAMEDTAG,
+    XML_UNNAMEDATTR,
+    XML_UNMATCHEDCLOSE,
+    XML_CLOSEWOOPEN,
+    XML_UNEXPECTED
+} XmlError;
+
 struct xmlDoc;
 typedef struct xmlDoc XmlDoc;
 
@@ -41,9 +53,14 @@ struct xmlElement;
 typedef struct xmlElement XmlElement;
 
 XmlDoc *parseDoc(const char *xmlText);
-void freeDoc(XmlDoc *doc);
-
+XmlError xmlDocError(const XmlDoc *doc);
+const char *xmlDocErrInfo(const XmlDoc *doc);
+char xmlDocErrChar(const XmlDoc *doc);
+long xmlDocLine(const XmlDoc *doc);
+long xmlDocColumn(const XmlDoc *doc);
 const XmlElement *rootElement(const XmlDoc *doc);
+void xmlDocPerror(const XmlDoc *doc, FILE *file, const char *fmt, ...);
+void freeDoc(XmlDoc *doc);
 
 const XmlElement *firstChild(const XmlElement *element);
 const XmlElement *lastChild(const XmlElement *element);

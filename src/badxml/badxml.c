@@ -3,10 +3,19 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdarg.h>
 
 struct xmlDoc
 {
     XmlElement *root;
+    const char *currLine;
+    union {
+	char c;
+	char *s;
+    } errInfo;
+    XmlError err;
+    long line;
+    long col;
 };
 
 struct xmlAttribute
@@ -29,12 +38,48 @@ struct xmlElement
     XmlElement *children;
 };
 
+static char *
+cloneString(const char *s)
+{
+    char *cpy = malloc(strlen(s)+1);
+    strcpy(cpy, s);
+    return cpy;
+}
 
 static void
-skipWs(const char **pos)
+skipWs(XmlDoc *doc, const char **pos)
 {
-    while (isspace(**pos)) ++(*pos);
+    while (isspace(**pos))
+    {
+	if (**pos == '\n')
+	{
+	    ++(doc->line);
+	    doc->currLine = ++(*pos);
+	}
+	else ++(*pos);
+    }
 }
+
+static void
+skipUntil(XmlDoc *doc, const char **pos, char endmark)
+{
+    while (**pos && **pos != endmark)
+    {
+	if (**pos == '\n')
+	{
+	    ++(doc->line);
+	    doc->currLine = ++(*pos);
+	}
+	else ++(*pos);
+    }
+}
+
+#define FAIL(x) \
+    do { doc->err = (x); goto fail; } while(0)
+#define FAILS(x, es) \
+    do { doc->err = (x); doc->errInfo.s = (es); goto fail; } while (0)
+#define FAILC(x, ec) \
+    do { doc->err = (x); doc->errInfo.c = (ec); goto fail; } while (0)
 
 static char *
 readBareWord(const char **pos, char endmark)
@@ -46,6 +91,7 @@ readBareWord(const char **pos, char endmark)
 
     if (!*start) return 0;
     while (!isspace(**pos) && **pos && **pos != endmark) ++(*pos);
+    if (*pos == start) return 0;
 
     word = calloc(1, (size_t)(*pos - start) + 1);
     memcpy(word, start, (size_t)(*pos - start));
@@ -90,13 +136,17 @@ freeDoc(XmlDoc *doc)
 {
     if (doc)
     {
-        freeElementList(doc->root);
-        free(doc);
+	freeElementList(doc->root);
+	if (doc->err == XML_UNMATCHEDCLOSE || doc->err == XML_CLOSEWOOPEN)
+	{
+	    free(doc->errInfo.s);
+	}
+	free(doc);
     }
 }
 
 static XmlAttribute *
-parseAttribute(const char **xmlText, XmlElement *element)
+parseAttribute(XmlDoc *doc, const char **xmlText, XmlElement *element)
 {
     const char *startval;
     XmlAttribute *attribute = calloc(1, sizeof(XmlAttribute));
@@ -104,131 +154,141 @@ parseAttribute(const char **xmlText, XmlElement *element)
     attribute->parent = element;
 
     attribute->name = readBareWord(xmlText, '=');
-    if (!attribute->name || !**xmlText) goto parseAttribute_fail;
-    skipWs(xmlText);
-    if (**xmlText != '=') goto parseAttribute_fail;
+    if (!attribute->name) FAIL(XML_UNNAMEDATTR);
+    if (!**xmlText) FAIL(XML_EOF);
+    skipWs(doc, xmlText);
+    if (**xmlText != '=') FAILC(XML_UNEXPECTED, **xmlText);
     ++(*xmlText);
-    skipWs(xmlText);
-    if (**xmlText != '"') goto parseAttribute_fail;
+    skipWs(doc, xmlText);
+    if (**xmlText != '"') FAILC(XML_UNEXPECTED, **xmlText);
     ++(*xmlText);
 
     startval = *xmlText;
-    while (**xmlText && **xmlText != '"') ++(*xmlText);
-    if (!**xmlText) goto parseAttribute_fail;
+    skipUntil(doc, xmlText, '"');
+    if (!**xmlText) FAIL(XML_EOF);
     attribute->value = calloc(1, (size_t)(*xmlText - startval) + 1);
     memcpy(attribute->value, startval, (size_t)(*xmlText - startval));
     ++(*xmlText);
     return attribute;
 
-parseAttribute_fail:
+fail:
+    doc->col = *xmlText - doc->currLine + 1;
     freeAttributeList(attribute);
     return 0;
 }
 
 static XmlElement *
-parseElement(const char **xmlText, XmlElement *parent)
+parseElement(XmlDoc *doc, const char **xmlText, XmlElement *parent)
 {
-    XmlElement *element;
-    XmlElement *childnode;
-    XmlAttribute *attribute;
-    const char *startval;
+    XmlElement *element = 0;
+    XmlElement *childnode = 0;
+    XmlAttribute *attribute = 0;
+    const char *startval = 0;
 
     ++(*xmlText);
-    if (!**xmlText || **xmlText == '/') return 0;
+    if (!**xmlText) FAIL(XML_EOF);
+    if (**xmlText == '/')
+    {
+	++(*xmlText);
+	FAILS(XML_CLOSEWOOPEN, readBareWord(xmlText, '>'));
+    }
 
     element = calloc(1, sizeof(XmlElement));
     element->prev = element->next = element;
     element->parent = parent;
     element->name = readBareWord(xmlText, '>');
-    if (!element->name || !**xmlText) goto parseElement_fail;
+    if (!element->name) FAIL(XML_UNNAMEDTAG);
+    if (!**xmlText) FAIL(XML_EOF);
 
-    childnode = 0;
-    attribute = 0;
     while (1)
     {
-        skipWs(xmlText);
-        if (!**xmlText) goto parseElement_fail;
+	skipWs(doc, xmlText);
+	if (!**xmlText) FAIL(XML_EOF);
 
-        if (**xmlText == '>')
-        {
-            ++(*xmlText);
-            break;
-        }
-        if (**xmlText == '/')
-        {
-            ++(*xmlText);
-            skipWs(xmlText);
-            if (!**xmlText) goto parseElement_fail;
-            if (**xmlText != '>') goto parseElement_fail;
-            ++(*xmlText);
-            return element;
-        }
-        attribute = parseAttribute(xmlText, element);
-        if (!attribute) goto parseElement_fail;
-        if (element->attributes)
-        {
-            attribute->prev = element->attributes->prev;
-            attribute->next = element->attributes;
-            element->attributes->prev->next = attribute;
-            element->attributes->prev = attribute;
-        }
-        else
-        {
-            element->attributes = attribute;
-        }
-        attribute = 0;
-        if (!**xmlText) goto parseElement_fail;
+	if (**xmlText == '>')
+	{
+	    ++(*xmlText);
+	    break;
+	}
+	if (**xmlText == '/')
+	{
+	    ++(*xmlText);
+	    skipWs(doc, xmlText);
+	    if (!**xmlText) FAIL(XML_EOF);
+	    if (**xmlText != '>') FAILC(XML_UNEXPECTED, **xmlText);
+	    ++(*xmlText);
+	    return element;
+	}
+	attribute = parseAttribute(doc, xmlText, element);
+	if (!attribute) goto failp;
+	if (element->attributes)
+	{
+	    attribute->prev = element->attributes->prev;
+	    attribute->next = element->attributes;
+	    element->attributes->prev->next = attribute;
+	    element->attributes->prev = attribute;
+	}
+	else
+	{
+	    element->attributes = attribute;
+	}
+	attribute = 0;
+	if (!**xmlText) FAIL(XML_EOF);
     }
 
     startval = *xmlText;
     while (**xmlText)
     {
-        if (**xmlText == '<')
-        {
-            if ((*xmlText)[1] == '/')
-            {
-                if (*xmlText != startval)
-                {
-                    element->value = calloc(1,
-			    (size_t)(*xmlText - startval) + 1);
-                    memcpy(element->value, startval,
-			    (size_t)(*xmlText - startval));
-                }
-                *xmlText += 2;
-                skipWs(xmlText);
-                if (!**xmlText) goto parseElement_fail;
-                if (strncmp(*xmlText, element->name, strlen(element->name)))
+	if (**xmlText == '<')
+	{
+	    if ((*xmlText)[1] == '/')
+	    {
+		if (*xmlText != startval)
 		{
-		    goto parseElement_fail;
+		    element->value = calloc(1,
+			    (size_t)(*xmlText - startval) + 1);
+		    memcpy(element->value, startval,
+			    (size_t)(*xmlText - startval));
 		}
-                *xmlText += strlen(element->name);
-                skipWs(xmlText);
-                if (!**xmlText || **xmlText != '>') goto parseElement_fail;
-                ++(*xmlText);
-                return element;
-            }
-            else
-            {
-                childnode = parseElement(xmlText, element);
-                if (!childnode) goto parseElement_fail;
-                if (element->children)
-                {
-                    childnode->prev = element->children->prev;
-                    childnode->next = element->children;
-                    element->children->prev->next = childnode;
-                    element->children->prev = childnode;
-                }
-                else
-                {
-                    element->children = childnode;
-                }
-                childnode = 0;
-            }
-        }
-        else ++(*xmlText);
+		*xmlText += 2;
+		skipWs(doc, xmlText);
+		if (!**xmlText) FAIL(XML_EOF);
+		if (strncmp(*xmlText, element->name, strlen(element->name)))
+		{
+		    FAILS(XML_UNMATCHEDCLOSE, cloneString(element->name));
+		}
+		*xmlText += strlen(element->name);
+		skipWs(doc, xmlText);
+		if (!**xmlText) FAIL(XML_EOF);
+		if (**xmlText != '>') FAILC(XML_UNEXPECTED, **xmlText);
+		++(*xmlText);
+		return element;
+	    }
+	    else
+	    {
+		childnode = parseElement(doc, xmlText, element);
+		if (!childnode) goto failp;
+		if (element->children)
+		{
+		    childnode->prev = element->children->prev;
+		    childnode->next = element->children;
+		    element->children->prev->next = childnode;
+		    element->children->prev = childnode;
+		}
+		else
+		{
+		    element->children = childnode;
+		}
+		childnode = 0;
+	    }
+	}
+	else skipUntil(doc, xmlText, '<');
     }
+    doc->err = XML_EOF;
 
-parseElement_fail:
+fail:
+    doc->col = *xmlText - doc->currLine + 1;
+failp:
     freeElementList(element);
     return 0;
 }
@@ -237,62 +297,159 @@ XmlDoc *
 parseDoc(const char *xmlText)
 {
     XmlDoc* doc = malloc(sizeof(XmlDoc));
-    const char *p = xmlText;
 
     doc->root = 0;
-    while(*p)
+    doc->err = XML_SUCCESS;
+    doc->line = 1;
+
+    while(*xmlText)
     {
-        if (*p == '<')
-        {
-            if (p[1] == '!' || p[1] == '?')
-            {
-                ++p;
-                while (*p && *p != '>') ++p;
-                if (!*p)
-                {
-                    freeElementList(doc->root);
-                    free(doc);
-                }
-                ++p;
-            }
-            else
-            {
-                if (doc->root)
-                {
-                    freeElementList(doc->root);
-                    free(doc);
-                    return 0;
-                }
-                else
-                {
-                    doc->root = parseElement(&p, 0);
-                    if (!doc->root)
-                    {
-                        free(doc);
-                        return 0;
-                    }
-                }
-            }
-        }
-        else if (isspace(*p))
-        {
-            skipWs(&p);
-        }
-        else
-        {
-            freeElementList(doc->root);
-            free(doc);
-            return 0;
-        }
+	if (*xmlText == '<')
+	{
+	    if (xmlText[1] == '!' || xmlText[1] == '?')
+	    {
+		++xmlText;
+		skipUntil(doc, &xmlText, '>');
+		if (!*xmlText)
+		{
+		    doc->err = XML_EOF;
+		    freeElementList(doc->root);
+		    doc->root = 0;
+		    return doc;
+		}
+		++xmlText;
+	    }
+	    else
+	    {
+		if (doc->root)
+		{
+		    doc->col = xmlText - doc->currLine + 1;
+		    doc->err = XML_SECONDROOT;
+		    freeElementList(doc->root);
+		    doc->root = 0;
+		    return doc;
+		}
+		else
+		{
+		    doc->root = parseElement(doc, &xmlText, 0);
+		    if (!doc->root) return doc;
+		}
+	    }
+	}
+	else if (isspace(*xmlText))
+	{
+	    skipWs(doc, &xmlText);
+	}
+	else
+	{
+	    doc->col = xmlText - doc->currLine + 1;
+	    doc->err = XML_UNEXPECTED;
+	    doc->errInfo.c = *xmlText;
+	    freeElementList(doc->root);
+	    doc->root = 0;
+	    return doc;
+	}
     }
 
     return doc;
+}
+
+XmlError
+xmlDocError(const XmlDoc *doc)
+{
+    return doc->err;
+}
+
+const char *
+xmlDocErrInfo(const XmlDoc *doc)
+{
+    if (doc->err == XML_UNMATCHEDCLOSE || doc->err == XML_CLOSEWOOPEN)
+    {
+	return doc->errInfo.s;
+    }
+    return 0;
+}
+
+char
+xmlDocErrChar(const XmlDoc *doc)
+{
+    if (doc->err == XML_UNEXPECTED) return doc->errInfo.c;
+    return 0;
+}
+
+long
+xmlDocLine(const XmlDoc *doc)
+{
+    return doc->line;
+}
+
+long
+xmlDocColumn(const XmlDoc *doc)
+{
+    return doc->col;
 }
 
 const XmlElement *
 rootElement(const XmlDoc *doc)
 {
     return doc->root;
+}
+
+void
+xmlDocPerror(const XmlDoc *doc, FILE *file, const char *fmt, ...)
+{
+    va_list ap;
+
+    if (!file) file = stderr;
+    if (fmt)
+    {
+	va_start(ap, fmt);
+	vfprintf(file, fmt, ap);
+	va_end(ap);
+    }
+    switch (doc->err)
+    {
+	case XML_SUCCESS:
+	    fputs(": successfully parsed.\n", file);
+	    break;
+
+	case XML_EOF:
+	    fputs(": unexpected end of file while parsing.\n", file);
+	    break;
+
+	case XML_SECONDROOT:
+	    fprintf(file, ": second root element found "
+		    "at line %ld, column %ld.\n", doc->line, doc->col);
+	    break;
+
+	case XML_UNNAMEDTAG:
+	    fprintf(file, ": tag without name found "
+		    "at line %ld, column %ld.\n", doc->line, doc->col);
+	    break;
+
+	case XML_UNNAMEDATTR:
+	    fprintf(file, ": attribute without name found "
+		    "at line %ld, column %ld.\n", doc->line, doc->col);
+	    break;
+
+	case XML_UNMATCHEDCLOSE:
+	    fprintf(file, ": closing tag doesn't match <%s> at line %ld, "
+		    "column %ld\n", doc->errInfo.s, doc->line, doc->col);
+	    break;
+
+	case XML_CLOSEWOOPEN:
+	    fprintf(file, ": closing tag </%s> was never opened at line %ld, "
+		    "column %ld\n", doc->errInfo.s, doc->line, doc->col);
+	    break;
+
+	case XML_UNEXPECTED:
+	    fprintf(file, ": found unexpected character `%c' at line %ld, "
+		    "column %ld\n", doc->errInfo.c, doc->line, doc->col);
+	    break;
+
+	default:
+	    fputs(": unknown error (aka BUG).\n", file);
+    }
 }
 
 const XmlElement *
@@ -311,7 +468,7 @@ const XmlElement *
 nextSibling(const XmlElement *element)
 {
     return (element->parent && element->next != element->parent->children ?
-            element->next : 0);
+	    element->next : 0);
 }
 
 const XmlElement *
@@ -322,7 +479,7 @@ parentElement(const XmlElement *element)
 
 const XmlElement *
 findMatching(const XmlElement *element,
-        const char *tagname, const char *attname, const char *attval)
+	const char *tagname, const char *attname, const char *attval)
 {
     const XmlElement *found;
     XmlAttribute *att = element->attributes;
@@ -330,23 +487,23 @@ findMatching(const XmlElement *element,
 
     if (!tagname || !strcmp(tagname, element->name))
     {
-        if (attname && att) do
-        {
-            if (!strcmp(attname, att->name) &&
-                   (!attval || !strcmp(attval, att->value)))
-            {
-                return element;
-            }
-            att = att->next;
-        } while (att != element->attributes);
-        else return element;
+	if (attname && att) do
+	{
+	    if (!strcmp(attname, att->name) &&
+		   (!attval || !strcmp(attval, att->value)))
+	    {
+		return element;
+	    }
+	    att = att->next;
+	} while (att != element->attributes);
+	else return element;
     }
 
     if (elem) do
     {
-        found = findMatching(elem, tagname, attname, attval);
-        if (found) return found;
-        elem = elem->next;
+	found = findMatching(elem, tagname, attname, attval);
+	if (found) return found;
+	elem = elem->next;
     } while (elem != element->children);
 
     return 0;
@@ -362,7 +519,7 @@ const XmlAttribute *
 nextAttribute(const XmlAttribute *attribute)
 {
     return (attribute->next != attribute->parent->attributes ?
-            attribute->next : 0);
+	    attribute->next : 0);
 }
 
 const XmlElement *
@@ -420,12 +577,12 @@ dumpXmlElement(const XmlElement *e, FILE *file, int shift)
     dumpXmlAttribute(e->attributes, file, shift+2);
     if (e->children)
     {
-        dumpXmlElement(e->children, file, shift+2);
+	dumpXmlElement(e->children, file, shift+2);
     }
     else if (e->value)
     {
-        for (i=0; i<shift; ++i) fputs(" ", file);
-        fprintf(file, "  value: %s\n", e->value);
+	for (i=0; i<shift; ++i) fputs(" ", file);
+	fprintf(file, "  value: %s\n", e->value);
     }
     if (e->parent && e->next != e->parent->children)
     {

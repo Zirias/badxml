@@ -73,9 +73,10 @@ int main(int argc, char **argv)
 
     free(xmlText);
 
-    if (!doc)
+    if (xmlDocError(doc) != XML_SUCCESS)
     {
-        fputs("Parse error.\n", stderr);
+	xmlDocPerror(doc, 0, "%s", "Parsing error");
+	freeDoc(doc);
         return 1;
     }
 
