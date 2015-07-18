@@ -1,7 +1,7 @@
 define BINRULES
 BINARIES += $$(BINDIR)$$(PSEP)$(T)$$(EXE)
 
-$(T)_SOURCES_FULL := $(addprefix $(P)$$(PSEP),$$($(T)_SOURCES))
+$(T)_SOURCES_FULL := $$(addprefix $(P)$$(PSEP),$$($(T)_SOURCES))
 SOURCES += $$($(T)_SOURCES_FULL)
 
 $$(BINDIR)$$(PSEP)$(T)$$(EXE): $$($(T)_SOURCES_FULL:.c=.o) \

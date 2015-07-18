@@ -1,5 +1,5 @@
 define LIBRULES
-$(T)_SOURCES_FULL := $(addprefix $(P)$$(PSEP),$$($(T)_SOURCES))
+$(T)_SOURCES_FULL := $$(addprefix $(P)$$(PSEP),$$($(T)_SOURCES))
 SOURCES += $$($(T)_SOURCES_FULL)
 CLEAN += $$($(T)_SOURCES_FULL:.c=_s.o)
 
