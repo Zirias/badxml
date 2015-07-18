@@ -75,7 +75,16 @@ int main(int argc, char **argv)
 
     if (xmlDocError(doc) != XML_SUCCESS)
     {
-	xmlDocPerror(doc, 0, "%s", "Parsing error");
+	if (argv[4])
+	{
+	    /* unparsable XML was read from file */
+	    xmlDocPerror(doc, stderr, "Error parsing `%s'", argv[4]);
+	}
+	else
+	{
+	    /* unparsable XML was read from stdin */
+	    xmlDocPerror(doc, stderr, "Error parsing standard input");
+	}
 	freeDoc(doc);
         return 1;
     }
