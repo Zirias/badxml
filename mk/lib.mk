@@ -14,7 +14,7 @@ define LIBCOMMONRULES
 
 $(P)$$(PSEP)%.d: $(P)$$(PSEP)%.c Makefile conf.mk
 	$$(VDEP)
-	$$(VR)$$(CCDEP) -MT"$@ $(@:.d=.o) $(@:.d=_s.o)" -MF$$@ \
+	$$(VR)$$(CCDEP) -MT"$$@ $$(@:.d=.o) $$(@:.d=_s.o)" -MF$$@ \
 	    $$(CFLAGS) $$(INCLUDES) $$<
 
 ifneq ($$(MAKECMDGOALS),clean)
