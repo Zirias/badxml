@@ -82,7 +82,7 @@ skipUntil(XmlDoc *doc, const char **pos, char endmark)
     do { doc->err = (x); doc->errInfo.c = (ec); goto fail; } while (0)
 
 static char *
-readBareWord(const char **pos, char endmark)
+readBareWord(const char **pos, const char* endmarks)
 {
     const char *start;
     char *word;
@@ -90,7 +90,14 @@ readBareWord(const char **pos, char endmark)
     start = *pos;
 
     if (!*start) return 0;
-    while (!isspace(**pos) && **pos && **pos != endmark) ++(*pos);
+    while (!isspace(**pos) && **pos)
+    {
+	const char *testend = endmarks;
+	while (*testend) if (**pos == *testend++) goto end;
+	++(*pos);
+    }
+       
+end:
     if (*pos == start) return 0;
 
     word = calloc(1, (size_t)(*pos - start) + 1);
@@ -153,23 +160,33 @@ parseAttribute(XmlDoc *doc, const char **xmlText, XmlElement *element)
     attribute->next = attribute->prev = attribute;
     attribute->parent = element;
 
-    attribute->name = readBareWord(xmlText, '=');
+    attribute->name = readBareWord(xmlText, "=");
     if (!attribute->name) FAIL(XML_UNNAMEDATTR);
     if (!**xmlText) FAIL(XML_EOF);
     skipWs(doc, xmlText);
     if (**xmlText != '=') FAILC(XML_UNEXPECTED, **xmlText);
     ++(*xmlText);
     skipWs(doc, xmlText);
-    if (**xmlText != '"') FAILC(XML_UNEXPECTED, **xmlText);
-    ++(*xmlText);
-
-    startval = *xmlText;
-    skipUntil(doc, xmlText, '"');
-    if (!**xmlText) FAIL(XML_EOF);
-    attribute->value = calloc(1, (size_t)(*xmlText - startval) + 1);
-    memcpy(attribute->value, startval, (size_t)(*xmlText - startval));
-    ++(*xmlText);
-    return attribute;
+    if (**xmlText == '"' || **xmlText == '\'')
+    {
+	++(*xmlText);
+	startval = *xmlText;
+	skipUntil(doc, xmlText, *(*xmlText-1));
+	if (!**xmlText) FAIL(XML_EOF);
+	if (*xmlText - startval)
+	{
+	    attribute->value = calloc(1, (size_t)(*xmlText - startval) + 1);
+	    memcpy(attribute->value, startval, (size_t)(*xmlText - startval));
+	}
+	++(*xmlText);
+	return attribute;
+    }
+    else
+    {
+	attribute->value = readBareWord(xmlText, "/>");
+	if (!**xmlText) FAIL(XML_EOF);
+	return attribute;
+    }
 
 fail:
     doc->col = *xmlText - doc->currLine + 1;
@@ -190,13 +207,13 @@ parseElement(XmlDoc *doc, const char **xmlText, XmlElement *parent)
     if (**xmlText == '/')
     {
 	++(*xmlText);
-	FAILS(XML_CLOSEWOOPEN, readBareWord(xmlText, '>'));
+	FAILS(XML_CLOSEWOOPEN, readBareWord(xmlText, ">"));
     }
 
     element = calloc(1, sizeof(XmlElement));
     element->prev = element->next = element;
     element->parent = parent;
-    element->name = readBareWord(xmlText, '>');
+    element->name = readBareWord(xmlText, ">");
     if (!element->name) FAIL(XML_UNNAMEDTAG);
     if (!**xmlText) FAIL(XML_EOF);
 
