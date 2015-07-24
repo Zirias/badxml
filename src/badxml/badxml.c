@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-struct xmlDoc
+struct XmlDoc
 {
     XmlElement *root;
     const char *currLine;
@@ -18,7 +18,7 @@ struct xmlDoc
     long col;
 };
 
-struct xmlAttribute
+struct XmlAttribute
 {
     char *name;
     char *value;
@@ -27,7 +27,7 @@ struct xmlAttribute
     XmlAttribute *next;
 };
 
-struct xmlElement
+struct XmlElement
 {
     char *name;
     char *value;
@@ -406,7 +406,7 @@ xmlDocColumn(const XmlDoc *doc)
     return doc->col;
 }
 
-const XmlElement *
+XmlElement *
 rootElement(const XmlDoc *doc)
 {
     return doc->root;
@@ -469,36 +469,36 @@ xmlDocPerror(const XmlDoc *doc, FILE *file, const char *fmt, ...)
     }
 }
 
-const XmlElement *
+XmlElement *
 firstChild(const XmlElement *element)
 {
     return element->children;
 }
 
-const XmlElement *
+XmlElement *
 lastChild(const XmlElement *element)
 {
     return (element->children ? element->children->prev : 0);
 }
 
-const XmlElement *
+XmlElement *
 nextSibling(const XmlElement *element)
 {
     return (element->parent && element->next != element->parent->children ?
 	    element->next : 0);
 }
 
-const XmlElement *
+XmlElement *
 parentElement(const XmlElement *element)
 {
     return element->parent;
 }
 
-const XmlElement *
+XmlElement *
 findMatching(const XmlElement *element,
 	const char *tagname, const char *attname, const char *attval)
 {
-    const XmlElement *found;
+    XmlElement *found = (XmlElement *)element;
     XmlAttribute *att = element->attributes;
     XmlElement *elem = element->children;
 
@@ -509,11 +509,11 @@ findMatching(const XmlElement *element,
 	    if (!strcmp(attname, att->name) &&
 		   (!attval || !strcmp(attval, att->value)))
 	    {
-		return element;
+		return found;
 	    }
 	    att = att->next;
 	} while (att != element->attributes);
-	else return element;
+	else return found;
     }
 
     if (elem) do
@@ -526,20 +526,20 @@ findMatching(const XmlElement *element,
     return 0;
 }
 
-const XmlAttribute *
+XmlAttribute *
 firstAttribute(const XmlElement *element)
 {
     return element->attributes;
 }
 
-const XmlAttribute *
+XmlAttribute *
 nextAttribute(const XmlAttribute *attribute)
 {
     return (attribute->next != attribute->parent->attributes ?
 	    attribute->next : 0);
 }
 
-const XmlElement *
+XmlElement *
 attributeElement(const XmlAttribute *attribute)
 {
     return attribute->parent;
@@ -579,7 +579,8 @@ dumpXmlAttribute(const XmlAttribute *a, FILE *file, int shift)
 
     for (i=0; i<shift; ++i) fputs(" ", file);
     fprintf(file, "[XmlAttribute]: %s, value: %s\n", a->name, a->value);
-    if (a->next != a->parent->attributes) dumpXmlAttribute(a->next, file, shift);
+    if (a->next != a->parent->attributes)
+	dumpXmlAttribute(a->next, file, shift);
 }
 
 static void

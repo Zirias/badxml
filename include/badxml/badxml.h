@@ -67,20 +67,14 @@ typedef enum xmlError
     XML_UNEXPECTED
 } XmlError;
 
-struct xmlDoc;
-
 /* represents the whole XML document */
-typedef struct xmlDoc XmlDoc;
-
-struct xmlAttribute;
+typedef struct XmlDoc XmlDoc;
 
 /* represents an attribute of an XML element */
-typedef struct xmlAttribute XmlAttribute;
-
-struct xmlElement;
+typedef struct XmlAttribute XmlAttribute;
 
 /* represents an XML element (tag) */
-typedef struct xmlElement XmlElement;
+typedef struct XmlElement XmlElement;
 
 
 /* parse xmlText as XML, return as XML document */
@@ -102,7 +96,7 @@ long xmlDocLine(const XmlDoc *doc);
 long xmlDocColumn(const XmlDoc *doc);
 
 /* get root element of the document, or 0 if there was an error */
-const XmlElement *rootElement(const XmlDoc *doc);
+XmlElement *rootElement(const XmlDoc *doc);
 
 /* format error message and print to file
  * (use stderr for printing to console) */
@@ -113,10 +107,10 @@ void xmlDocPerror(const XmlDoc *doc, FILE *file, const char *fmt, ...);
 void freeDoc(XmlDoc *doc);
 
 /* navigation in the document */
-const XmlElement *firstChild(const XmlElement *element);
-const XmlElement *lastChild(const XmlElement *element);
-const XmlElement *nextSibling(const XmlElement *element);
-const XmlElement *parentElement(const XmlElement *element);
+XmlElement *firstChild(const XmlElement *element);
+XmlElement *lastChild(const XmlElement *element);
+XmlElement *nextSibling(const XmlElement *element);
+XmlElement *parentElement(const XmlElement *element);
 
 /* find first element matching the arguments to this function,
  * starting at given element, doing a depth-first search.
@@ -126,13 +120,13 @@ const XmlElement *parentElement(const XmlElement *element);
  * if attname is given without attval, the presence of the attribute is a match
  *
  * might return the element itself if it matches. */
-const XmlElement *findMatching(const XmlElement *element,
+XmlElement *findMatching(const XmlElement *element,
         const char *tagname, const char *attname, const char *attval);
 
 /* navigate attribute list of an element */
-const XmlAttribute *firstAttribute(const XmlElement *element);
-const XmlAttribute *nextAttribute(const XmlAttribute *attribute);
-const XmlElement *attributeElement(const XmlAttribute *attribute);
+XmlAttribute *firstAttribute(const XmlElement *element);
+XmlAttribute *nextAttribute(const XmlAttribute *attribute);
+XmlElement *attributeElement(const XmlAttribute *attribute);
 
 /* getters. The elementContent() gets the whole text (including tags) between
  * opening and closing tag of the element. */
