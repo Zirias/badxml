@@ -5,7 +5,8 @@ This is a one-file library for parsing text to a very simple object model,
 recognizing the most basic XML syntax. The only things recognized are:
 
   - Elements (tags with names)
-  - Attributes as long as their value is enclosed in double quotes
+  - Attributes (values need to be provided, double quoted, single quoted and
+    even bareword are supported)
   - The content of elements (anything between opening and closing tag as text)
 
 It might be useful in cases where you don't need a real XML parser and pulling
