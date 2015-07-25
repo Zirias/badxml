@@ -16,6 +16,7 @@ struct XmlDoc
     XmlError err;
     long line;
     long col;
+    size_t textLen;
 };
 
 struct XmlAttribute
@@ -72,6 +73,29 @@ skipUntil(XmlDoc *doc, const char **pos, char endmark)
 	}
 	else ++(*pos);
     }
+}
+
+static int
+hasNonWs(const char *start, const char *end)
+{
+    while (start != end) if (!isspace(*start++)) return 1;
+    return 0;
+}
+
+static void
+appendString(char **s, const char *src, size_t *ssize, size_t n)
+{
+    if (*ssize)
+    {
+	*ssize += n;
+	*s = realloc(*s, *ssize);
+    }
+    else
+    {
+	*ssize = n+1;
+	*s = malloc(*ssize);
+    }
+    strncat(*s, src, n);
 }
 
 #define FAIL(x) \
@@ -201,6 +225,7 @@ parseElement(XmlDoc *doc, const char **xmlText, XmlElement *parent)
     XmlElement *childnode = 0;
     XmlAttribute *attribute = 0;
     const char *startval = 0;
+    size_t valLen = 0;
 
     ++(*xmlText);
     if (!**xmlText) FAIL(XML_EOF);
@@ -258,15 +283,13 @@ parseElement(XmlDoc *doc, const char **xmlText, XmlElement *parent)
     {
 	if (**xmlText == '<')
 	{
+	    if (hasNonWs(startval, *xmlText))
+	    {
+		appendString(&(element->value), startval, &valLen,
+			(size_t)(*xmlText - startval));
+	    }
 	    if ((*xmlText)[1] == '/')
 	    {
-		if (*xmlText != startval)
-		{
-		    element->value = calloc(1,
-			    (size_t)(*xmlText - startval) + 1);
-		    memcpy(element->value, startval,
-			    (size_t)(*xmlText - startval));
-		}
 		*xmlText += 2;
 		skipWs(doc, xmlText);
 		if (!**xmlText) FAIL(XML_EOF);
@@ -297,6 +320,7 @@ parseElement(XmlDoc *doc, const char **xmlText, XmlElement *parent)
 		    element->children = childnode;
 		}
 		childnode = 0;
+		startval = *xmlText;
 	    }
 	}
 	else skipUntil(doc, xmlText, '<');
@@ -597,7 +621,7 @@ dumpXmlElement(const XmlElement *e, FILE *file, int shift)
     {
 	dumpXmlElement(e->children, file, shift+2);
     }
-    else if (e->value)
+    if (e->value)
     {
 	for (i=0; i<shift; ++i) fputs(" ", file);
 	fprintf(file, "  value: %s\n", e->value);
