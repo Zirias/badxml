@@ -16,7 +16,6 @@ struct XmlDoc
     XmlError err;
     long line;
     long col;
-    size_t textLen;
 };
 
 struct XmlAttribute
@@ -37,7 +36,41 @@ struct XmlElement
     XmlElement *next;
     XmlAttribute *attributes;
     XmlElement *children;
+    unsigned int depth;
 };
+
+struct stringBuilder
+{
+    char *buf;
+    char *bufp;
+    char *endp;
+    size_t bufsize;
+};
+
+static void sbInit(struct stringBuilder *sb)
+{
+    sb->buf = malloc(1024);
+    sb->bufp = sb->buf;
+    sb->endp = sb->buf + 1024;
+    *sb->bufp = '\0';
+    sb->bufsize = 1024;
+}
+
+static void sbAppend(struct stringBuilder *sb, const char *s)
+{
+    while (*s)
+    {
+	*sb->bufp++ = *s++;
+	if (sb->bufp == sb->endp)
+	{
+	    sb->buf = realloc(sb->buf, sb->bufsize * 2);
+	    sb->bufp = sb->buf + sb->bufsize;
+	    sb->bufsize *= 2;
+	    sb->endp = sb->buf + sb->bufsize;
+	}
+    }
+    *sb->bufp = '\0';
+}
 
 static char *
 cloneString(const char *s)
@@ -94,6 +127,7 @@ appendString(char **s, const char *src, size_t *ssize, size_t n)
     {
 	*ssize = n+1;
 	*s = malloc(*ssize);
+	**s = '\0';
     }
     strncat(*s, src, n);
 }
@@ -225,6 +259,7 @@ parseElement(XmlDoc *doc, const char **xmlText, XmlElement *parent)
     XmlElement *childnode = 0;
     XmlAttribute *attribute = 0;
     const char *startval = 0;
+    const char *endval = 0;
     size_t valLen = 0;
 
     ++(*xmlText);
@@ -238,6 +273,14 @@ parseElement(XmlDoc *doc, const char **xmlText, XmlElement *parent)
     element = calloc(1, sizeof(XmlElement));
     element->prev = element->next = element;
     element->parent = parent;
+    if (parent)
+    {
+	element->depth = parent->depth + 1;
+    }
+    else
+    {
+	element->depth = 0;
+    }
     element->name = readBareWord(xmlText, ">");
     if (!element->name) FAIL(XML_UNNAMEDTAG);
     if (!**xmlText) FAIL(XML_EOF);
@@ -285,8 +328,10 @@ parseElement(XmlDoc *doc, const char **xmlText, XmlElement *parent)
 	{
 	    if (hasNonWs(startval, *xmlText))
 	    {
+		endval = *xmlText;
+		while (isspace(*(endval-1))) --endval;
 		appendString(&(element->value), startval, &valLen,
-			(size_t)(*xmlText - startval));
+			(size_t)(endval - startval));
 	    }
 	    if ((*xmlText)[1] == '/')
 	    {
@@ -591,6 +636,76 @@ const char *
 attributeValue(const XmlAttribute *attribute)
 {
     return attribute->value;
+}
+
+static void
+xmlAttributeText(struct stringBuilder *sb, const XmlAttribute *attribute)
+{
+    sbAppend(sb, " ");
+    sbAppend(sb, attribute->name);
+    sbAppend(sb, "=");
+    if (strchr(attribute->value, '"'))
+    {
+	if (strchr(attribute->value, '\''))
+	{
+	    sbAppend(sb, "\"\"");
+	}
+	else
+	{
+	    sbAppend(sb, "'");
+	    sbAppend(sb, attribute->value);
+	    sbAppend(sb, "'");
+	}
+    }
+    else
+    {
+	sbAppend(sb, "\"");
+	sbAppend(sb, attribute->value);
+	sbAppend(sb, "\"");
+    }
+    if (attribute->next != attribute->parent->attributes)
+	xmlAttributeText(sb, attribute->next);
+}
+
+static void
+xmlElementText(struct stringBuilder *sb, const XmlElement *element)
+{
+    unsigned int i;
+
+    if (element->parent) sbAppend(sb, "\n");
+    for (i = 0; i < element->depth; ++i) sbAppend(sb, "  ");
+    sbAppend(sb, "<");
+    sbAppend(sb, element->name);
+    if (element->attributes) xmlAttributeText(sb, element->attributes);
+    if (element->children || element->value)
+    {
+	sbAppend(sb, ">");
+	if (element->value) sbAppend(sb, element->value);
+	if (element->children)
+	{
+	    xmlElementText(sb, element->children);
+	    sbAppend(sb, "\n");
+	    for (i = 0; i < element->depth; ++i) sbAppend(sb, "  ");
+	}
+	sbAppend(sb, "</");
+	sbAppend(sb, element->name);
+	sbAppend(sb, ">");
+    }
+    else sbAppend(sb, " />");
+    if (element->parent && element->next != element->parent->children)
+	xmlElementText(sb, element->next);
+}
+
+char *
+xmlText(const XmlDoc *doc)
+{
+    struct stringBuilder sb;
+
+    if (!doc || !doc->root) return 0;
+
+    sbInit(&sb);
+    xmlElementText(&sb, doc->root);
+    return sb.buf;
 }
 
 #ifdef BADXML_DEBUG

@@ -135,6 +135,8 @@ const char *elementContent(const XmlElement *element);
 const char *attributeName(const XmlAttribute *attribute);
 const char *attributeValue(const XmlAttribute *attribute);
 
+char *xmlText(const XmlDoc *doc);
+
 #ifdef BADXML_DEBUG
 /* for debugging: dump document structure to file (typically stderr) */
 void dumpDoc(const XmlDoc *doc, FILE *file);

@@ -58,7 +58,7 @@ int main(int argc, char **argv)
     XmlDoc *doc;
     const XmlElement *element;
     const char *val;
-    char *xmlText;
+    char *xml;
 
     if (argc < 4)
     {
@@ -66,12 +66,12 @@ int main(int argc, char **argv)
 		argv[0]);
         return 1;
     }
-    xmlText = readFile(argv[4]);
+    xml = readFile(argv[4]);
 
     /* parse the text and get an object tree */
-    doc = parseDoc(xmlText);
+    doc = parseDoc(xml);
 
-    free(xmlText);
+    free(xml);
 
     if (xmlDocError(doc) != XML_SUCCESS)
     {
@@ -91,6 +91,10 @@ int main(int argc, char **argv)
 
     /* this is a no-op unless compiled with -DBADXML_DEBUG */
     dumpDoc(doc, stderr);
+
+    xml = xmlText(doc);
+    puts(xml);
+    free(xml);
 
     /* example: find an element matching tagname and attribute name and value */
     element = findMatching(rootElement(doc), argv[1], argv[2], argv[3]);
